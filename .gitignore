@@ -216,3 +216,4 @@ models/
 *.pth
 *.ckpt
 tensorboard/
+resources
