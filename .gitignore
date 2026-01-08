@@ -217,3 +217,5 @@ models/
 *.ckpt
 tensorboard/
 resources
+server/leaderboard.db
+*.db
