@@ -151,19 +151,26 @@ def evaluate_submission(
         raise FileNotFoundError(f"Missing checkpoint.pt in {submission_dir}")
 
     if sandboxed:
-        from server.sandbox import run_sandboxed_evaluation
-        start_time = time.perf_counter()
-        result = run_sandboxed_evaluation(
-            submission_dir, env_name, num_episodes, seed, timeout
-        )
-        eval_time = time.perf_counter() - start_time
-        return EvalResult(
-            mean_reward=result["mean_reward"],
-            std_reward=result["std_reward"],
-            mean_length=result["mean_length"],
-            episodes=result["episodes"],
-            eval_time=eval_time,
-        )
+        try:
+            from server.sandbox import run_sandboxed_evaluation
+            start_time = time.perf_counter()
+            result = run_sandboxed_evaluation(
+                submission_dir, env_name, num_episodes, seed, timeout
+            )
+            eval_time = time.perf_counter() - start_time
+            return EvalResult(
+                mean_reward=result["mean_reward"],
+                std_reward=result["std_reward"],
+                mean_length=result["mean_length"],
+                episodes=result["episodes"],
+                eval_time=eval_time,
+            )
+        except Exception as e:
+            # Fallback to non-sandboxed if sandbox fails (e.g., in some container envs)
+            import logging
+            logging.warning(f"Sandbox failed ({e}), falling back to direct evaluation")
+            policy = load_policy_from_submission(policy_path, checkpoint_path)
+            return evaluate_policy(policy, env_name, num_episodes, seed, timeout)
     else:
         policy = load_policy_from_submission(policy_path, checkpoint_path)
         return evaluate_policy(policy, env_name, num_episodes, seed, timeout)

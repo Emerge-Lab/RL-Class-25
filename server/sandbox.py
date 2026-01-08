@@ -20,6 +20,12 @@ For stronger isolation, consider:
 """
 
 import multiprocessing
+# Use fork on Linux for faster subprocess startup
+try:
+    multiprocessing.set_start_method('fork')
+except RuntimeError:
+    pass  # Already set
+
 import resource
 import signal
 import sys
