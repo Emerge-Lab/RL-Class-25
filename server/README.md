@@ -31,22 +31,28 @@ curl http://localhost:8000/leaderboard/cartpole
    railway init
    ```
 
-3. Add a volume for persistent database storage:
+3. Create a service and link to it:
+   ```bash
+   railway add --service eval-server
+   ```
+
+4. Add a volume for persistent database storage:
    ```bash
    railway volume add
+   # When prompted, set mount path to: /data
    ```
 
-4. Set the DATA_DIR environment variable to the volume mount path:
+5. Set the DATA_DIR environment variable:
    ```bash
-   railway variables set DATA_DIR=/data
+   railway variables --set "DATA_DIR=/data"
    ```
 
-5. Deploy:
+6. Deploy:
    ```bash
    railway up
    ```
 
-6. Get your public URL:
+7. Get your public URL:
    ```bash
    railway domain
    ```
