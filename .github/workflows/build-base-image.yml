@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/rl-eval-base
+  IMAGE_NAME: emerge-lab/rl-eval-base
 
 jobs:
   build:

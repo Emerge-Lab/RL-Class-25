@@ -1,7 +1,7 @@
 # Use pre-built base image with all dependencies
 # Build base with: docker build --platform linux/amd64 -t USERNAME/rl-eval-base -f Dockerfile.base .
 # Push with: docker push USERNAME/rl-eval-base
-FROM ghcr.io/eugenevinitsky/rl-eval-base:latest
+FROM ghcr.io/emerge-lab/rl-eval-base:latest
 
 WORKDIR /app
 
