@@ -8,5 +8,12 @@ dependencies = [
     "fastapi>=0.128.0",
     "pufferlib>=3.0.0",
     "python-multipart>=0.0.21",
+    "requests>=2.32.0",
     "uvicorn>=0.40.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "httpx>=0.28.0",
+    "pytest>=8.0.0",
 ]

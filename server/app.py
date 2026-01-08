@@ -1,6 +1,7 @@
 """FastAPI server for policy submissions and leaderboard."""
 
 import os
+import secrets
 import shutil
 import sqlite3
 import tempfile
@@ -9,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from contextlib import contextmanager
 
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Header, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -21,10 +22,27 @@ app = FastAPI(title="RL Policy Evaluation Server")
 DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
 DB_PATH = DATA_DIR / "leaderboard.db"
 
+# Admin API key from environment variable
+ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", "dev-admin-key")
+
 
 def init_db():
     """Initialize the SQLite database."""
     with sqlite3.connect(DB_PATH) as conn:
+        # Students table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS students (
+                id TEXT PRIMARY KEY,
+                email TEXT UNIQUE NOT NULL,
+                api_key TEXT UNIQUE NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_api_key ON students(api_key)
+        """)
+
+        # Submissions table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS submissions (
                 id TEXT PRIMARY KEY,
@@ -56,6 +74,37 @@ def get_db():
         conn.close()
 
 
+def generate_api_key() -> str:
+    """Generate a secure API key."""
+    return f"sk_{secrets.token_urlsafe(24)}"
+
+
+def get_student_by_api_key(api_key: str) -> dict | None:
+    """Look up student by API key."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM students WHERE api_key = ?",
+            (api_key,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def verify_admin_key(x_admin_key: str = Header(...)) -> str:
+    """Verify admin API key."""
+    if x_admin_key != ADMIN_API_KEY:
+        raise HTTPException(401, "Invalid admin key")
+    return x_admin_key
+
+
+def verify_student_key(x_api_key: str = Header(...)) -> dict:
+    """Verify student API key and return student info."""
+    student = get_student_by_api_key(x_api_key)
+    if not student:
+        raise HTTPException(401, "Invalid API key")
+    return student
+
+
+# Pydantic models
 class SubmissionResponse(BaseModel):
     submission_id: str
     student_id: str
@@ -76,14 +125,102 @@ class LeaderboardEntry(BaseModel):
     submitted_at: str
 
 
+class StudentCreate(BaseModel):
+    email: str
+
+
+class StudentResponse(BaseModel):
+    id: str
+    email: str
+    api_key: str
+    created_at: str
+
+
 @app.on_event("startup")
 async def startup():
     init_db()
 
 
+# ============ Admin Endpoints ============
+
+@app.post("/admin/students", response_model=StudentResponse)
+async def create_student(
+    student: StudentCreate,
+    _: str = Depends(verify_admin_key)
+):
+    """Create a new student account. Returns the API key (shown only once)."""
+    student_id = str(uuid.uuid4())[:8]
+    api_key = generate_api_key()
+    created_at = datetime.utcnow().isoformat()
+
+    with get_db() as conn:
+        try:
+            conn.execute(
+                "INSERT INTO students (id, email, api_key, created_at) VALUES (?, ?, ?, ?)",
+                (student_id, student.email, api_key, created_at)
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            raise HTTPException(400, f"Student with email {student.email} already exists")
+
+    return StudentResponse(
+        id=student_id,
+        email=student.email,
+        api_key=api_key,
+        created_at=created_at
+    )
+
+
+@app.get("/admin/students")
+async def list_students(_: str = Depends(verify_admin_key)):
+    """List all students (without API keys for security)."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, email, created_at FROM students ORDER BY created_at DESC"
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+@app.delete("/admin/students/{student_id}")
+async def delete_student(student_id: str, _: str = Depends(verify_admin_key)):
+    """Delete a student account."""
+    with get_db() as conn:
+        result = conn.execute("DELETE FROM students WHERE id = ?", (student_id,))
+        conn.commit()
+        if result.rowcount == 0:
+            raise HTTPException(404, "Student not found")
+    return {"status": "deleted", "student_id": student_id}
+
+
+@app.post("/admin/students/{student_id}/regenerate-key", response_model=StudentResponse)
+async def regenerate_api_key(student_id: str, _: str = Depends(verify_admin_key)):
+    """Regenerate API key for a student."""
+    new_api_key = generate_api_key()
+
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM students WHERE id = ?", (student_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Student not found")
+
+        conn.execute(
+            "UPDATE students SET api_key = ? WHERE id = ?",
+            (new_api_key, student_id)
+        )
+        conn.commit()
+
+    return StudentResponse(
+        id=row["id"],
+        email=row["email"],
+        api_key=new_api_key,
+        created_at=row["created_at"]
+    )
+
+
+# ============ Student Endpoints ============
+
 @app.post("/submit", response_model=SubmissionResponse)
 async def submit_policy(
-    student_id: str = Form(...),
+    student: dict = Depends(verify_student_key),
     env_name: str = Form(default="cartpole"),
     policy_file: UploadFile = File(...),
     checkpoint_file: UploadFile = File(...),
@@ -92,12 +229,15 @@ async def submit_policy(
     """
     Submit a policy for evaluation.
 
-    - student_id: Your unique identifier
+    Requires X-API-Key header for authentication.
+
     - env_name: Environment to evaluate on (default: cartpole)
     - policy_file: Python file defining load_policy(checkpoint_path)
     - checkpoint_file: PyTorch checkpoint (.pt file)
     - num_episodes: Number of episodes to run (default: 100)
     """
+    student_id = student["email"]  # Use email as the display ID
+
     # Validate file extensions
     if not policy_file.filename.endswith(".py"):
         raise HTTPException(400, "policy_file must be a .py file")
@@ -181,6 +321,8 @@ async def submit_policy(
     )
 
 
+# ============ Public Endpoints ============
+
 @app.get("/leaderboard/{env_name}", response_model=list[LeaderboardEntry])
 async def get_leaderboard(env_name: str, limit: int = 50):
     """
@@ -213,9 +355,14 @@ async def get_leaderboard(env_name: str, limit: int = 50):
     ]
 
 
-@app.get("/submissions/{student_id}")
-async def get_student_submissions(student_id: str, env_name: str | None = None):
-    """Get all submissions for a student."""
+@app.get("/my-submissions")
+async def get_my_submissions(
+    student: dict = Depends(verify_student_key),
+    env_name: str | None = None
+):
+    """Get all submissions for the authenticated student."""
+    student_id = student["email"]
+
     with get_db() as conn:
         if env_name:
             rows = conn.execute(
