@@ -128,6 +128,7 @@ def evaluate_submission(
     num_episodes: int = 100,
     seed: int = 42,
     timeout: float = 60.0,
+    sandboxed: bool = True,
 ) -> EvalResult:
     """
     Evaluate a student submission directory.
@@ -136,6 +137,9 @@ def evaluate_submission(
         submission_dir/
         ├── policy.py      # defines load_policy(checkpoint_path) -> callable
         └── checkpoint.pt  # model weights
+
+    Args:
+        sandboxed: If True, run in isolated subprocess with resource limits
     """
     submission_dir = Path(submission_dir)
     policy_path = submission_dir / "policy.py"
@@ -146,8 +150,23 @@ def evaluate_submission(
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Missing checkpoint.pt in {submission_dir}")
 
-    policy = load_policy_from_submission(policy_path, checkpoint_path)
-    return evaluate_policy(policy, env_name, num_episodes, seed, timeout)
+    if sandboxed:
+        from server.sandbox import run_sandboxed_evaluation
+        start_time = time.perf_counter()
+        result = run_sandboxed_evaluation(
+            submission_dir, env_name, num_episodes, seed, timeout
+        )
+        eval_time = time.perf_counter() - start_time
+        return EvalResult(
+            mean_reward=result["mean_reward"],
+            std_reward=result["std_reward"],
+            mean_length=result["mean_length"],
+            episodes=result["episodes"],
+            eval_time=eval_time,
+        )
+    else:
+        policy = load_policy_from_submission(policy_path, checkpoint_path)
+        return evaluate_policy(policy, env_name, num_episodes, seed, timeout)
 
 
 if __name__ == "__main__":
