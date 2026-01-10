@@ -1370,6 +1370,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "jinja2" },
     { name = "pufferlib" },
     { name = "python-multipart" },
     { name = "requests" },
@@ -1386,6 +1387,7 @@ dev = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.128.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28.0" },
+    { name = "jinja2", specifier = ">=3.1.0" },
     { name = "pufferlib", specifier = ">=3.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "python-multipart", specifier = ">=0.0.21" },

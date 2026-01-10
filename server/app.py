@@ -10,11 +10,16 @@ from datetime import datetime
 from pathlib import Path
 from contextlib import contextmanager
 
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Header, Depends
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Header, Depends, Request
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from server.evaluate import evaluate_submission, EvalResult
+
+# Templates directory
+TEMPLATES_DIR = Path(__file__).parent / "templates"
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 app = FastAPI(title="RL Policy Evaluation Server")
 
@@ -355,12 +360,12 @@ async def get_leaderboard(env_name: str, limit: int = 50):
     ]
 
 
-@app.get("/my-submissions")
+@app.get("/api/my-submissions")
 async def get_my_submissions(
     student: dict = Depends(verify_student_key),
     env_name: str | None = None
 ):
-    """Get all submissions for the authenticated student."""
+    """Get all submissions for the authenticated student (API endpoint)."""
     student_id = student["email"]
 
     with get_db() as conn:
@@ -399,3 +404,272 @@ async def list_environments():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+# ============ Web Pages ============
+
+def get_environments_list():
+    """Get list of available environments."""
+    return [
+        {"name": "cartpole", "description": "Classic CartPole balancing task"},
+    ]
+
+
+# Simple flash message support (stored in query params for simplicity)
+def flash_context():
+    """Return empty flash messages context (messages passed via template)."""
+    return {"get_flashed_messages": lambda with_categories=False: []}
+
+
+@app.get("/", response_class=HTMLResponse)
+async def web_leaderboard(request: Request, env: str = "cartpole"):
+    """Web page showing the leaderboard."""
+    environments = get_environments_list()
+
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT student_id, MAX(mean_reward) as mean_reward, std_reward, submitted_at
+            FROM submissions
+            WHERE env_name = ?
+            GROUP BY student_id
+            ORDER BY mean_reward DESC
+            LIMIT 50
+            """,
+            (env,),
+        ).fetchall()
+
+    entries = [
+        {
+            "rank": i + 1,
+            "student_id": row["student_id"],
+            "mean_reward": row["mean_reward"],
+            "std_reward": row["std_reward"],
+            "submitted_at": row["submitted_at"],
+        }
+        for i, row in enumerate(rows)
+    ]
+
+    return templates.TemplateResponse(
+        "leaderboard.html",
+        {
+            "request": request,
+            "entries": entries,
+            "environments": environments,
+            "current_env": env,
+            **flash_context(),
+        },
+    )
+
+
+@app.get("/submit", response_class=HTMLResponse)
+async def web_submit_form(request: Request):
+    """Web page for submitting policies."""
+    return templates.TemplateResponse(
+        "submit.html",
+        {
+            "request": request,
+            "environments": get_environments_list(),
+            "error": None,
+            "result": None,
+            **flash_context(),
+        },
+    )
+
+
+@app.post("/submit", response_class=HTMLResponse)
+async def web_submit_policy(
+    request: Request,
+    api_key: str = Form(...),
+    env_name: str = Form(default="cartpole"),
+    policy_file: UploadFile = File(...),
+    checkpoint_file: UploadFile = File(...),
+    num_episodes: int = Form(default=100),
+):
+    """Handle web form submission."""
+    # Verify API key
+    student = get_student_by_api_key(api_key)
+    if not student:
+        return templates.TemplateResponse(
+            "submit.html",
+            {
+                "request": request,
+                "environments": get_environments_list(),
+                "error": "Invalid API key",
+                "result": None,
+                **flash_context(),
+            },
+        )
+
+    student_id = student["email"]
+
+    # Validate file extensions
+    if not policy_file.filename.endswith(".py"):
+        return templates.TemplateResponse(
+            "submit.html",
+            {
+                "request": request,
+                "environments": get_environments_list(),
+                "error": "Policy file must be a .py file",
+                "result": None,
+                **flash_context(),
+            },
+        )
+
+    if not checkpoint_file.filename.endswith(".pt"):
+        return templates.TemplateResponse(
+            "submit.html",
+            {
+                "request": request,
+                "environments": get_environments_list(),
+                "error": "Checkpoint file must be a .pt file",
+                "result": None,
+                **flash_context(),
+            },
+        )
+
+    # Create temporary directory for submission
+    with tempfile.TemporaryDirectory() as tmpdir:
+        submission_dir = Path(tmpdir)
+
+        # Save uploaded files
+        policy_path = submission_dir / "policy.py"
+        checkpoint_path = submission_dir / "checkpoint.pt"
+
+        with open(policy_path, "wb") as f:
+            shutil.copyfileobj(policy_file.file, f)
+        with open(checkpoint_path, "wb") as f:
+            shutil.copyfileobj(checkpoint_file.file, f)
+
+        # Run evaluation
+        try:
+            result = evaluate_submission(
+                submission_dir,
+                env_name=env_name,
+                num_episodes=num_episodes,
+                seed=42,
+                timeout=60.0,
+            )
+        except Exception as e:
+            return templates.TemplateResponse(
+                "submit.html",
+                {
+                    "request": request,
+                    "environments": get_environments_list(),
+                    "error": f"Evaluation failed: {str(e)}",
+                    "result": None,
+                    **flash_context(),
+                },
+            )
+
+    # Store in database
+    submission_id = str(uuid.uuid4())[:8]
+    submitted_at = datetime.utcnow().isoformat()
+
+    with get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO submissions
+            (id, student_id, env_name, mean_reward, std_reward, mean_length, episodes, eval_time, submitted_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                submission_id,
+                student_id,
+                env_name,
+                result.mean_reward,
+                result.std_reward,
+                result.mean_length,
+                result.episodes,
+                result.eval_time,
+                submitted_at,
+            ),
+        )
+        conn.commit()
+
+        # Get rank
+        rank = conn.execute(
+            """
+            SELECT COUNT(*) + 1 FROM (
+                SELECT student_id, MAX(mean_reward) as best
+                FROM submissions
+                WHERE env_name = ?
+                GROUP BY student_id
+                HAVING best > ?
+            )
+            """,
+            (env_name, result.mean_reward),
+        ).fetchone()[0]
+
+    return templates.TemplateResponse(
+        "submit.html",
+        {
+            "request": request,
+            "environments": get_environments_list(),
+            "error": None,
+            "result": {
+                "mean_reward": result.mean_reward,
+                "std_reward": result.std_reward,
+                "episodes": result.episodes,
+                "rank": rank,
+            },
+            **flash_context(),
+        },
+    )
+
+
+@app.get("/my-submissions", response_class=HTMLResponse)
+async def web_my_submissions(request: Request, api_key: str | None = None):
+    """Web page showing user's submissions."""
+    if not api_key:
+        return templates.TemplateResponse(
+            "my_submissions.html",
+            {
+                "request": request,
+                "api_key": None,
+                "submissions": [],
+                "student_email": None,
+                "error": None,
+                **flash_context(),
+            },
+        )
+
+    student = get_student_by_api_key(api_key)
+    if not student:
+        return templates.TemplateResponse(
+            "my_submissions.html",
+            {
+                "request": request,
+                "api_key": None,
+                "submissions": [],
+                "student_email": None,
+                "error": "Invalid API key",
+                **flash_context(),
+            },
+        )
+
+    student_id = student["email"]
+
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM submissions
+            WHERE student_id = ?
+            ORDER BY submitted_at DESC
+            """,
+            (student_id,),
+        ).fetchall()
+
+    submissions = [dict(row) for row in rows]
+
+    return templates.TemplateResponse(
+        "my_submissions.html",
+        {
+            "request": request,
+            "api_key": api_key,
+            "submissions": submissions,
+            "student_email": student_id,
+            "error": None,
+            **flash_context(),
+        },
+    )

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}My Submissions - RL Policy Evaluation{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">My Submissions</h1>
+
+        {% if not api_key %}
+        <form method="GET" class="mb-6">
+            <div class="flex gap-4">
+                <input type="password" name="api_key" required
+                       class="flex-1 border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                       placeholder="Enter your API key (sk_...)">
+                <button type="submit"
+                        class="bg-indigo-600 text-white py-2 px-6 rounded-lg font-medium hover:bg-indigo-700 transition-colors">
+                    View Submissions
+                </button>
+            </div>
+        </form>
+        {% else %}
+
+        {% if error %}
+        <div class="mb-4 p-4 rounded-lg bg-red-100 text-red-700">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <div class="mb-4 flex justify-between items-center">
+            <p class="text-gray-600">Showing submissions for <span class="font-medium">{{ student_email }}</span></p>
+            <a href="/my-submissions" class="text-indigo-600 hover:underline text-sm">Switch account</a>
+        </div>
+
+        {% if submissions %}
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b-2 border-gray-200">
+                        <th class="text-left py-3 px-4 text-gray-600 font-semibold">Environment</th>
+                        <th class="text-right py-3 px-4 text-gray-600 font-semibold">Mean Reward</th>
+                        <th class="text-right py-3 px-4 text-gray-600 font-semibold">Std Dev</th>
+                        <th class="text-right py-3 px-4 text-gray-600 font-semibold">Episodes</th>
+                        <th class="text-right py-3 px-4 text-gray-600 font-semibold">Eval Time</th>
+                        <th class="text-right py-3 px-4 text-gray-600 font-semibold">Submitted</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sub in submissions %}
+                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                        <td class="py-3 px-4">
+                            <span class="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-sm">{{ sub.env_name }}</span>
+                        </td>
+                        <td class="py-3 px-4 text-right font-mono text-green-600">{{ "%.2f"|format(sub.mean_reward) }}</td>
+                        <td class="py-3 px-4 text-right font-mono text-gray-500">&plusmn;{{ "%.2f"|format(sub.std_reward) }}</td>
+                        <td class="py-3 px-4 text-right font-mono">{{ sub.episodes }}</td>
+                        <td class="py-3 px-4 text-right font-mono text-gray-500">{{ "%.1f"|format(sub.eval_time) }}s</td>
+                        <td class="py-3 px-4 text-right text-gray-500 text-sm">{{ sub.submitted_at[:16].replace('T', ' ') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-4 p-4 bg-gray-50 rounded-lg">
+            <h3 class="font-medium text-gray-700 mb-2">Summary</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                    <span class="text-gray-500">Total Submissions:</span>
+                    <span class="font-medium ml-1">{{ submissions|length }}</span>
+                </div>
+                <div>
+                    <span class="text-gray-500">Best Reward:</span>
+                    <span class="font-medium ml-1 text-green-600">{{ "%.2f"|format(submissions|map(attribute='mean_reward')|max) }}</span>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-12 text-gray-500">
+            <p class="text-lg">No submissions yet.</p>
+            <p class="mt-2"><a href="/submit" class="text-indigo-600 hover:underline">Submit your first policy</a>!</p>
+        </div>
+        {% endif %}
+
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

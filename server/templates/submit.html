@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Submit Policy - RL Policy Evaluation{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Submit Your Policy</h1>
+
+        {% if error %}
+        <div class="mb-4 p-4 rounded-lg bg-red-100 text-red-700">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        {% if result %}
+        <div class="mb-6 p-4 rounded-lg bg-green-100 text-green-700">
+            <h3 class="font-semibold mb-2">Submission Successful!</h3>
+            <div class="grid grid-cols-2 gap-2 text-sm">
+                <div>Mean Reward:</div>
+                <div class="font-mono">{{ "%.2f"|format(result.mean_reward) }}</div>
+                <div>Std Dev:</div>
+                <div class="font-mono">&plusmn;{{ "%.2f"|format(result.std_reward) }}</div>
+                <div>Episodes:</div>
+                <div class="font-mono">{{ result.episodes }}</div>
+                <div>Your Rank:</div>
+                <div class="font-mono font-bold">#{{ result.rank }}</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <form method="POST" enctype="multipart/form-data" class="space-y-6">
+            <div>
+                <label for="api_key" class="block text-sm font-medium text-gray-700 mb-1">
+                    API Key <span class="text-red-500">*</span>
+                </label>
+                <input type="password" id="api_key" name="api_key" required
+                       class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                       placeholder="sk_...">
+                <p class="mt-1 text-sm text-gray-500">Your personal API key (provided by instructor)</p>
+            </div>
+
+            <div>
+                <label for="env_name" class="block text-sm font-medium text-gray-700 mb-1">
+                    Environment
+                </label>
+                <select id="env_name" name="env_name"
+                        class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    {% for env in environments %}
+                        <option value="{{ env.name }}">{{ env.name }} - {{ env.description }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label for="policy_file" class="block text-sm font-medium text-gray-700 mb-1">
+                    Policy File (.py) <span class="text-red-500">*</span>
+                </label>
+                <input type="file" id="policy_file" name="policy_file" accept=".py" required
+                       class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <p class="mt-1 text-sm text-gray-500">Python file with <code class="bg-gray-100 px-1 rounded">load_policy(checkpoint_path)</code> function</p>
+            </div>
+
+            <div>
+                <label for="checkpoint_file" class="block text-sm font-medium text-gray-700 mb-1">
+                    Checkpoint File (.pt) <span class="text-red-500">*</span>
+                </label>
+                <input type="file" id="checkpoint_file" name="checkpoint_file" accept=".pt" required
+                       class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <p class="mt-1 text-sm text-gray-500">PyTorch checkpoint with model weights</p>
+            </div>
+
+            <div>
+                <label for="num_episodes" class="block text-sm font-medium text-gray-700 mb-1">
+                    Number of Episodes
+                </label>
+                <input type="number" id="num_episodes" name="num_episodes" value="100" min="10" max="1000"
+                       class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <p class="mt-1 text-sm text-gray-500">Number of episodes to evaluate (10-1000)</p>
+            </div>
+
+            <button type="submit"
+                    class="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 transition-colors">
+                Submit Policy
+            </button>
+        </form>
+    </div>
+
+    <div class="mt-6 bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-3">Policy File Format</h2>
+        <p class="text-sm text-gray-600 mb-3">Your policy.py must define a <code class="bg-gray-100 px-1 rounded">load_policy</code> function:</p>
+        <pre class="bg-gray-800 text-green-400 p-4 rounded-lg text-sm overflow-x-auto">
+import torch
+import torch.nn as nn
+
+class Policy(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(4, 64),
+            nn.ReLU(),
+            nn.Linear(64, 2)
+        )
+
+    def forward(self, x):
+        return self.net(x).argmax(dim=-1)
+
+def load_policy(checkpoint_path):
+    policy = Policy()
+    policy.load_state_dict(torch.load(checkpoint_path))
+    policy.eval()
+    return policy</pre>
+    </div>
+</div>
+{% endblock %}
