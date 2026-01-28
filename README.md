@@ -13,11 +13,6 @@ Reinforcement Learning course project using [PufferLib](https://github.com/Puffe
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-**Windows:**
-```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
 **Homebrew (macOS):**
 ```bash
 brew install uv

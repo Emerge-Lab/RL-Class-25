@@ -219,3 +219,7 @@ tensorboard/
 resources
 server/leaderboard.db
 *.db
+
+# Homework solutions (keep private)
+*solutions*
+CLAUDE.md
