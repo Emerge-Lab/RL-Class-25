@@ -4,12 +4,12 @@ This homework covers tabular Q-learning methods.
 
 ## Structure
 
-- `Homework_1_theory.pdf` - Theory questions (submit on Gradescope)
+- `Homework_1_theory.pdf` - Theory questions (submit on Brightspace)
 - `problem_1/` - Tabular Q-iteration for MountainCar
 
 ## Submission Instructions
 
-### Theory (Gradescope)
+### Theory (Brightspace)
 Submit your answers to the theory questions as a PDF on Brightspace.
 
 ### Programming Problems (Leaderboard)
