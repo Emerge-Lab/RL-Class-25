@@ -223,3 +223,6 @@ server/leaderboard.db
 # Homework solutions (keep private)
 *solutions*
 CLAUDE.md
+
+# Sensitive data
+student_api_keys.csv
