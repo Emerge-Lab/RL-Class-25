@@ -20,6 +20,16 @@ import matplotlib.pyplot as plt
 
 from pufferlib.ocean.pong.pong import Pong
 
+from homeworks.homework_2.problem_1.ppo_components import (  # noqa: F401
+    RolloutBuffer,
+    compute_entropy_bonus,
+    compute_policy_loss,
+    compute_value_loss,
+    discrete_log_prob,
+    normalize_advantages,
+    sample_discrete_action,
+)
+
 
 # =============================================================================
 # Hyperparameters (tuned — you shouldn't need to change these)

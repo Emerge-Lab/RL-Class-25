@@ -24,8 +24,15 @@ import gymnasium as gym
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from homeworks.homework_2.problem_2.dqn_components import (
+from homeworks.homework_2.problem_2.dqn_components import (  # noqa: F401
     QNetwork,
+    NStepReplayBuffer,
+    batch_to_tensors,
+    compute_double_dqn_target,
+    compute_td_loss,
+    epsilon_greedy_action,
+    hard_update,
+    linear_epsilon_decay,
 )
 
 # =============================================================================
