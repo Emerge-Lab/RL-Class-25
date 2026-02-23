@@ -35,10 +35,7 @@ uv run python test_components.py
 ```
 
 ### Problem 3: PPO Training on Pong (`problem_3/`)
-Put your PPO components together into a training loop on PufferLib's native Pong:
-- Collect rollouts from vectorized environments
-- Compute GAE advantages
-- Run the PPO clipped update with multiple epochs of minibatches
+Put your PPO components together into a training loop on PufferLib's native Pong.
 
 **Train your agent:**
 ```bash
@@ -47,10 +44,7 @@ uv run python train_ppo.py
 ```
 
 ### Problem 4: DQN Training on CartPole (`problem_4/`)
-Put your DQN components together into a training loop on CartPole-v1:
-- Epsilon-greedy exploration with n-step replay buffer
-- Double DQN target computation
-- Periodic target network updates
+Put your DQN components together into a training loop on CartPole-v1.
 
 **Train your agent:**
 ```bash
