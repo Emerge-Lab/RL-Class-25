@@ -8,9 +8,18 @@ dependencies = [
     "pufferlib>=3.0.0",
     "requests>=2.32.0",
     "gymnasium[classic-control]<=0.29.1",
+    "matplotlib>=3.8.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
+    "pre-commit>=3.0.0",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["homeworks"]
