@@ -138,6 +138,8 @@ def normalize_advantages(advantages: torch.Tensor) -> torch.Tensor:
     Nuances to handle:
         - Add a small epsilon (1e-8) to the standard deviation to prevent division
           by zero when all advantages are identical.
+        - Use torch.std() with its default settings (Bessel's correction, i.e.
+          dividing by N-1) for the standard deviation.
 
     """
     # TODO: Implement this
@@ -327,13 +329,26 @@ def sample_continuous_action(
         1. Sample z ~ N(mean, std)           # Unbounded Gaussian sample
         2. action = tanh(z)                   # Squash to [-1, 1]
 
-    The log probability requires a Jacobian correction for the tanh transform:
-        log p(action) = log p(z) - sum(log(1 - tanh(z)^2))
-                      = log p(z) - sum(log(1 - action^2))
+    The log probability requires a Jacobian correction for the tanh transform.
+    When you apply a deterministic transformation a = tanh(z) to a random variable z,
+    the probability density changes according to the change-of-variables formula:
+
+        p(a) = p(z) * |dz/da|
+
+    Since da/dz = 1 - tanh(z)^2 = 1 - a^2, we have |dz/da| = 1 / (1 - a^2).
+    Taking the log and summing over action dimensions:
+
+        log p(a) = log p(z) - sum(log(1 - a^2))
+
+    Intuitively, tanh "compresses" the tails of the Gaussian — many different z values
+    near +/-inf all map to actions near +/-1. The Jacobian correction accounts for this
+    compression: actions near the boundaries are more likely than the raw Gaussian
+    density would suggest, because a wide range of z values map there.
 
     Why tanh squashing?
     - Many environments expect actions in some bounded range.
-    - Clipping actions without correcting for the changed probabilities leads to an incorrect likelihood.
+    - Clipping actions without correcting for the changed probabilities leads to
+      an incorrect likelihood, which breaks policy gradient methods.
 
     Args:
         mean: Tensor of shape (batch_size, action_dim) - Gaussian mean
@@ -359,7 +374,8 @@ def squashed_gaussian_log_prob(
     we need to:
     1. Invert the tanh to get the original unbounded action: z = atanh(action)
     2. Compute the Gaussian log probability of z
-    3. Apply the Jacobian correction for the tanh transform
+    3. Apply the Jacobian correction for the tanh transform (see
+       sample_continuous_action docstring for the derivation)
 
     This is used during PPO updates when we need to compute the log probability
     of actions that were sampled earlier (and stored as squashed actions).
@@ -497,8 +513,10 @@ def compute_entropy_bonus(probs: torch.Tensor) -> torch.Tensor:
     adding entropy to the objective (maximizing entropy = more exploration).
 
     Args:
-        probs: Tensor of shape (batch_size, num_actions) containing action probabilities.
-               Note: This takes probabilities, not logits!
+        probs: Tensor of shape (batch_size, num_actions) containing action probabilities
+               (i.e., after softmax). Unlike discrete_entropy which takes raw logits and
+               applies softmax internally, this function expects pre-normalized probabilities
+               that sum to 1 along the last dimension.
 
     Returns:
         entropy: Scalar tensor containing mean entropy across the batch

@@ -8,6 +8,9 @@ Run with: uv run python test_components.py
 """
 
 import argparse
+import random
+import sys
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -907,25 +910,49 @@ def main():
     print("=" * 60)
     if total_passed == total_tests:
         print(f"{Colors.GREEN}All {total_tests} tests passed!{Colors.RESET}")
-        print("""
-      _          ___
-    /' '\\       / " \\
-   |  ,--+-----4 /   |
-   ',/   o  o     --.;
---._|_   ,--.  _.,-- \\----.
-------'--`--' '-----,' VJ  |
-     \\_  ._\\_.   _,-'---._.'
-       `--...--``  /
-         /###\\   | |
-         |.   `.-'-'.
-        .||  /,     |
-       do_o00oo_,.ob
-
-Here's a puppy video as a reward: https://openpuppies.com/mp4/P6Q0XzB.mp4
-""")
+        print()
+        pups = [
+            "2m78jPG",
+            "pn1e9TO",
+            "MQCIwzT",
+            "udLK6FS",
+            "ZNem5o3",
+            "DS2IZ6K",
+            "aydRUz8",
+            "MVUdQYK",
+            "kLvno0p",
+            "wScLiVz",
+            "Z0TII8i",
+            "F1SChho",
+            "9hRi2jN",
+            "lvzRF3W",
+            "fqHxOGI",
+            "1xeUYme",
+            "6tVqKyM",
+            "CCxZ6Wr",
+        ]
+        pup = random.choice(pups)
+        print("      _          ___          ")
+        print("    /' '\\       / \" \\         ")
+        print("   |  ,--+-----4 /   |        ")
+        print("   ',/   o  o     --.;        ")
+        print("--._|_   ,--.  _.,-- \\----.   ")
+        print("------'--`--' '-----,' VJ  |  ")
+        print("     \\_  ._\\_.   _,-'---._.'  ")
+        print("       `--...--``  /          ")
+        print("         /###\\   | |          ")
+        print("         |.   `.-'-'.         ")
+        print("        .||  /,     |         ")
+        print("       do_o00oo_,.ob          ")
+        print()
+        print(
+            f"Here's a puppy video as a reward: https://openpuppies.com/mp4/{pup}.mp4"
+        )
     else:
         print(f"{Colors.RED}{total_passed}/{total_tests} tests passed{Colors.RESET}")
     print("=" * 60)
+
+    sys.exit(0 if total_passed == total_tests else 1)
 
 
 if __name__ == "__main__":
