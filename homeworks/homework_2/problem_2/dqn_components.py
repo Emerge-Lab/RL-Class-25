@@ -229,7 +229,7 @@ def epsilon_greedy_action(
         num_actions: Number of possible actions
 
     Returns:
-        action: Selected action index
+        action: int — selected action index
 
     Nuances to handle:
         - q_values may be 1D or 2D (with batch dim of 1) - squeeze if needed
@@ -257,7 +257,7 @@ def linear_epsilon_decay(
         decay_steps: Number of steps for decay
 
     Returns:
-        epsilon: Current epsilon value
+        epsilon: float — current epsilon value
 
     Nuances to handle:
         - After decay_steps, epsilon should stay at epsilon_end (not go below)

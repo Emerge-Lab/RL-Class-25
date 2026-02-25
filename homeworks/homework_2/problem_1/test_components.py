@@ -6,8 +6,10 @@ Testing framework inspired by Sasha Rush's Tensor Puzzles:
 https://github.com/srush/Tensor-Puzzles
 
 Run with: uv run python test_components.py
+         uv run python test_components.py --hint   (show failure details)
 """
 
+import argparse
 import torch
 from typing import Callable, List, Tuple, Dict, Any
 import traceback
@@ -32,6 +34,8 @@ from ppo_components import (
     clip_action,
     RolloutBuffer,
 )
+
+SHOW_HINTS = False
 
 
 # =============================================================================
@@ -177,7 +181,28 @@ def test_compute_gae() -> TestResult:
                 ]
             ),
         ),
-        # Case 2: Episode boundary in env 0 but not env 1 (num_steps=3, num_envs=2)
+        # Case 2: Varying values across timesteps (num_steps=3, num_envs=1)
+        # This catches the bug of using values[t] instead of values[t+1]
+        # delta_2 = 1 + 0.99*2.0 - 1.5 = 1.48
+        # delta_1 = 1 + 0.99*1.5 - 1.0 = 1.485
+        # delta_0 = 1 + 0.99*1.0 - 0.5 = 1.49
+        (
+            {
+                "rewards": torch.tensor([[1.0], [1.0], [1.0]]),
+                "values": torch.tensor([[0.5], [1.0], [1.5], [2.0]]),
+                "dones": torch.tensor([[0.0], [0.0], [0.0]]),
+                "gamma": 0.99,
+                "lam": 0.95,
+            },
+            torch.tensor(
+                [
+                    [1.49 + 0.9405 * (1.485 + 0.9405 * 1.48)],
+                    [1.485 + 0.9405 * 1.48],
+                    [1.48],
+                ]
+            ),
+        ),
+        # Case 3: Episode boundary in env 0 but not env 1 (num_steps=3, num_envs=2)
         (
             {
                 "rewards": torch.tensor([[1.0, 1.0], [2.0, 1.0], [1.0, 1.0]]),
@@ -797,6 +822,7 @@ def test_rollout_buffer() -> TestResult:
             )
 
         # Test batching: verify all samples appear exactly once
+        # (PPO uses non-overlapping minibatches, not sampling with replacement)
         torch.manual_seed(0)
         all_values = []
         for batch in buffer.get_batches(
@@ -926,6 +952,16 @@ def test_rollout_buffer_episode_boundary() -> TestResult:
 
 def run_all_tests() -> None:
     """Run all tests and display results."""
+    global SHOW_HINTS
+    parser = argparse.ArgumentParser(description="PPO Components Test Suite")
+    parser.add_argument(
+        "--hint",
+        action="store_true",
+        help="Show detailed failure messages to help debug failing tests",
+    )
+    args = parser.parse_args()
+    SHOW_HINTS = args.hint
+
     print("=" * 60)
     print("PPO Components Test Suite")
     print("=" * 60)
@@ -986,7 +1022,7 @@ def run_all_tests() -> None:
 
             status = "\033[92mPASS\033[0m" if result.passed else "\033[91mFAIL\033[0m"
             print(f"  [{status}] {result.name}")
-            if not result.passed:
+            if not result.passed and SHOW_HINTS:
                 for line in result.message.split("\n"):
                     print(f"         {line}")
 

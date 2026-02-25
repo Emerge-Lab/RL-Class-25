@@ -63,7 +63,7 @@ uv sync
 
 **Problem 1:** All 16 tests should pass. If you succeed, you'll get a surprise...!
 
-**Problem 2:** All 19 tests should pass.
+**Problem 2:** All 24 tests should pass.
 
 **Problem 3:** Your PPO agent should achieve positive average reward on Pong within 500k timesteps.
 

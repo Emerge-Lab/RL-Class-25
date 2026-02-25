@@ -47,6 +47,11 @@ Run the test suite to check your implementations:
 uv run python test_components.py
 ```
 
+If a test fails and you want to see a detailed explanation of what went wrong:
+```bash
+uv run python test_components.py --hint
+```
+
 The tests are organized by part and will show you which components pass and which fail.
 
 ## Tips

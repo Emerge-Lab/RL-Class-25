@@ -30,8 +30,9 @@ def compute_returns(
         G_T = r_T                           (last timestep)
         G_t = r_t + gamma * G_{t+1}         (all other timesteps)
 
-    Episode boundaries: When done[t] = 1, the episode ended at timestep t.
-    This means G_t should not include rewards from future episodes:
+    Episode boundaries: When done[t] = 1, the episode ended at timestep t,
+    meaning r_t is the last reward of that episode. The return at step t
+    should include r_t but not any rewards from future timesteps/episodes:
         G_t = r_t + gamma * G_{t+1} * (1 - done[t])
 
     Args:
@@ -40,7 +41,7 @@ def compute_returns(
         gamma: Discount factor (typically 0.99)
 
     Returns:
-        returns: Tensor of same shape as rewards
+        returns: Tensor of shape (num_steps, num_envs)
 
     Example:
         rewards = [1, 1, 1, 1], dones = [0, 0, 0, 0], gamma = 0.99
@@ -104,7 +105,7 @@ def compute_gae(
              - lambda=1: Use full Monte Carlo return (low bias, high variance)
 
     Returns:
-        advantages: Tensor of same shape as rewards
+        advantages: Tensor of shape (num_steps, num_envs)
 
     Nuances to handle:
         - Episode boundaries require two separate (1-done) multipliers:
@@ -275,7 +276,7 @@ def gaussian_entropy(log_std: torch.Tensor) -> torch.Tensor:
         log_std: Tensor of shape (action_dim,) or (batch_size, action_dim)
 
     Returns:
-        entropy: Scalar (if 1D input) or tensor of shape (batch_size,)
+        entropy: Scalar tensor (if 1D input) or tensor of shape (batch_size,) (if 2D input)
 
     Nuances to handle:
         - For multi-dimensional actions, sum entropy over all dimensions.

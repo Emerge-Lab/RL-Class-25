@@ -4,8 +4,10 @@ DQN Components Test Suite - Homework 2, Problem 2
 Tests for the DQN building blocks implemented in dqn_components.py.
 
 Run with: uv run python test_components.py
+         uv run python test_components.py --hint   (show failure details)
 """
 
+import argparse
 import numpy as np
 import torch
 import torch.nn as nn
@@ -25,6 +27,8 @@ from dqn_components import (
     QNetwork,
 )
 
+SHOW_HINTS = False
+
 
 class Colors:
     GREEN = "\033[92m"
@@ -38,7 +42,8 @@ def test_passed(name: str):
 
 def test_failed(name: str, msg: str):
     print(f"  [{Colors.RED}FAIL{Colors.RESET}] {name}")
-    print(f"         {msg}")
+    if SHOW_HINTS:
+        print(f"         {msg}")
 
 
 def assert_close(actual, expected, name: str, rtol: float = 1e-4, atol: float = 1e-6):
@@ -113,8 +118,9 @@ def test_replay_buffer_capacity():
         assert len(buffer) == 5, f"Buffer should have 5 items, got {len(buffer)}"
 
         # The oldest transitions should be gone (FIFO)
-        # Check that the states in buffer are from the last 5 pushes
-        states_in_buffer = [t.state[0] for t in buffer.buffer]
+        # Sample all items and check that states are from the last 5 pushes
+        batch = buffer.sample(len(buffer))
+        states_in_buffer = [t.state[0] for t in batch]
         assert min(states_in_buffer) >= 5, "Oldest transitions should be evicted"
 
         test_passed("replay_buffer_capacity")
@@ -159,8 +165,16 @@ def test_batch_to_tensors():
         ), f"dones should be float32, got {dones.dtype}"
 
         # Check values
+        assert_close(states, torch.tensor([[1.0, 2.0], [3.0, 4.0]]), "states")
+        assert_close(next_states, torch.tensor([[2.0, 3.0], [4.0, 5.0]]), "next_states")
+        assert_close(actions, torch.tensor([0, 1]), "actions")
         assert_close(rewards, torch.tensor([1.0, -1.0]), "rewards")
         assert_close(dones, torch.tensor([0.0, 1.0]), "dones")
+
+        # Check states dtype
+        assert (
+            states.dtype == torch.float32
+        ), f"states should be float32, got {states.dtype}"
 
         test_passed("batch_to_tensors")
         return True
@@ -185,9 +199,13 @@ def test_nstep_buffer_basic():
         # (transitions 0,1,2 are ready; 3,4 still in n-step buffer)
         assert len(buffer) == 3, f"Expected 3 transitions, got {len(buffer)}"
 
-        # Check the first transition's n-step return
+        # Sample all transitions and sort by state to check in order
+        batch = buffer.sample(len(buffer))
+        batch.sort(key=lambda t: t.state[0])
+
+        # Check the first transition's n-step return (starting from state 0)
         # R_3 = 1.0 + 0.9*1.0 + 0.81*1.0 = 2.71
-        t = buffer.buffer.buffer[0]
+        t = batch[0]
         expected_return = 1.0 + 0.9 * 1.0 + 0.81 * 1.0
         assert (
             abs(t.reward - expected_return) < 1e-5
@@ -218,16 +236,20 @@ def test_nstep_buffer_episode_boundary():
         # On done, all pending transitions should be flushed
         assert len(buffer) == 2, f"Expected 2 transitions, got {len(buffer)}"
 
-        # First transition: R = 1.0 + 0.9*2.0 = 2.8 (2 steps, episode ends)
-        t0 = buffer.buffer.buffer[0]
+        # Sample all transitions and sort by state to check in order
+        batch = buffer.sample(len(buffer))
+        batch.sort(key=lambda t: t.state[0])
+
+        # First transition (state 0): R = 1.0 + 0.9*2.0 = 2.8 (2 steps, episode ends)
+        t0 = batch[0]
         expected = 1.0 + 0.9 * 2.0
         assert (
             abs(t0.reward - expected) < 1e-5
         ), f"Expected return {expected}, got {t0.reward}"
         assert t0.done is True, "Should be done (episode ended within n steps)"
 
-        # Second transition: R = 2.0 (just the terminal reward)
-        t1 = buffer.buffer.buffer[1]
+        # Second transition (state 1): R = 2.0 (just the terminal reward)
+        t1 = batch[1]
         assert abs(t1.reward - 2.0) < 1e-5, f"Expected return 2.0, got {t1.reward}"
         assert t1.done is True, "Terminal transition should have done=True"
 
@@ -251,9 +273,13 @@ def test_nstep_buffer_one_step():
         # With n=1, every push should immediately go to main buffer
         assert len(buffer) == 5, f"Expected 5 transitions, got {len(buffer)}"
 
+        # Sample all and sort by state to check rewards match raw values
+        batch = buffer.sample(len(buffer))
+        batch.sort(key=lambda t: t.state[0])
+
         # Returns should just be the raw rewards (no discounting across steps)
         for i in range(5):
-            t = buffer.buffer.buffer[i]
+            t = batch[i]
             assert (
                 abs(t.reward - float(i)) < 1e-5
             ), f"Expected reward {float(i)}, got {t.reward}"
@@ -279,7 +305,9 @@ def test_epsilon_greedy_greedy():
         # With epsilon=0, should always pick action 1 (highest Q-value)
         for _ in range(10):
             action = epsilon_greedy_action(q_values, epsilon=0.0, num_actions=3)
-            assert action == 1, f"With epsilon=0, should pick action 1, got {action}"
+            assert (
+                int(action) == 1
+            ), f"With epsilon=0, should pick action 1, got {action}"
 
         test_passed("epsilon_greedy_greedy")
         return True
@@ -296,7 +324,7 @@ def test_epsilon_greedy_random():
 
         # With epsilon=1, should explore all actions
         actions = [
-            epsilon_greedy_action(q_values, epsilon=1.0, num_actions=3)
+            int(epsilon_greedy_action(q_values, epsilon=1.0, num_actions=3))
             for _ in range(100)
         ]
 
@@ -320,7 +348,7 @@ def test_epsilon_greedy_2d_input():
         q_values = torch.tensor([[1.0, 5.0, 3.0]])  # Shape (1, 3)
 
         action = epsilon_greedy_action(q_values, epsilon=0.0, num_actions=3)
-        assert action == 1, f"Should handle 2D input, expected 1, got {action}"
+        assert int(action) == 1, f"Should handle 2D input, expected 1, got {action}"
 
         test_passed("epsilon_greedy_2d_input")
         return True
@@ -684,22 +712,21 @@ def test_compute_td_loss_detach():
 
 
 def test_soft_update():
-    """Test soft_update with tau=0.1."""
+    """Test soft_update with tau=0.1 and non-zero target weights."""
     try:
-        # Create simple networks
+        # Create simple networks with non-zero target weights
+        # This catches the bug: target = tau * online (dropping the target term)
         online = nn.Linear(2, 2, bias=False)
         target = nn.Linear(2, 2, bias=False)
 
-        # Set known weights
         with torch.no_grad():
             online.weight.fill_(1.0)
-            target.weight.fill_(0.0)
+            target.weight.fill_(10.0)
 
-        # Soft update with tau=0.1
         soft_update(online, target, tau=0.1)
 
-        # target = 0.1 * 1.0 + 0.9 * 0.0 = 0.1
-        expected = torch.full_like(target.weight, 0.1)
+        # target = 0.1 * 1.0 + 0.9 * 10.0 = 9.1
+        expected = torch.full_like(target.weight, 9.1)
         assert_close(target.weight, expected, "soft_update tau=0.1")
 
         test_passed("soft_update")
@@ -793,6 +820,16 @@ def test_qnetwork_forward():
 
 
 def main():
+    global SHOW_HINTS
+    parser = argparse.ArgumentParser(description="DQN Components Test Suite")
+    parser.add_argument(
+        "--hint",
+        action="store_true",
+        help="Show detailed failure messages to help debug failing tests",
+    )
+    args = parser.parse_args()
+    SHOW_HINTS = args.hint
+
     print("=" * 60)
     print("DQN Components Test Suite")
     print("=" * 60)
