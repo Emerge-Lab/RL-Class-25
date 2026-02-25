@@ -1,6 +1,6 @@
 # Homework 2: PPO and DQN
 
-In this homework, you will implement the core components of two foundational deep RL algorithms — Proximal Policy Optimization (PPO) and Deep Q-Network (DQN) — then train agents on Pong.
+In this homework, you will implement the core components of two foundational deep RL algorithms, Proximal Policy Optimization (PPO) and Deep Q-Network (DQN), then train agents on Pong and Cartpole respectively.
 
 ## Structure
 
