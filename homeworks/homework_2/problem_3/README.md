@@ -51,14 +51,6 @@ uv run python train_ppo.py
 
 You should see positive average reward within 200k timesteps. The learning curve is saved to `ppo_pong.png`.
 
-## Tips
-
-- Convert observations/rewards/dones to tensors before storing in the buffer
-- Use `torch.no_grad()` when collecting rollouts (no gradients needed for action selection)
-- The bootstrap value for `compute_returns_and_advantages` comes from running the last observation through the critic
-- Clip gradients with `torch.nn.utils.clip_grad_norm_`
-- Track episode rewards by accumulating rewards between terminal/truncation flags
-
 ## Leaderboard Submission
 
 After training, submit your policy to the course leaderboard:

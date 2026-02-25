@@ -135,26 +135,6 @@ def train():
     """
     Train a PPO agent on Pong and return a list of mean episode rewards per rollout.
 
-    High-level steps:
-        1. Create the Pong environment (with max_score=5), ActorCritic model, optimizer, and RolloutBuffer.
-        2. Collect rollouts: for NUM_STEPS, use the model to get logits and values,
-           sample actions with sample_discrete_action, step the environment, and
-           store transitions in the buffer.
-        3. After each rollout, compute advantages and returns using the buffer's
-           compute_returns_and_advantages method (you need the value of the last
-           observation as the bootstrap value).
-        4. PPO update: for NUM_EPOCHS, iterate over minibatches from the buffer.
-           For each minibatch:
-             - Run the model on the batch observations to get new logits and values
-             - Compute new log probs with discrete_log_prob
-             - Normalize advantages
-             - Compute policy loss (compute_policy_loss)
-             - Compute value loss (compute_value_loss)
-             - Compute entropy bonus (compute_entropy_bonus) using softmax(logits)
-             - Total loss = policy_loss + VALUE_COEF * value_loss - ENTROPY_COEF * entropy
-             - Backprop, clip gradients (max_norm=MAX_GRAD_NORM), optimizer step
-        5. Track mean episode rewards for each rollout.
-
     Returns:
         List of mean episode rewards (one per rollout).
     """

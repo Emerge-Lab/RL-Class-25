@@ -109,34 +109,6 @@ def train():
     """
     Train a DQN agent on CartPole-v1 and return a list of episode rewards.
 
-    High-level steps:
-        1. Create a CartPole-v1 environment (gym.make("CartPole-v1")),
-           online/target QNetworks, optimizer, and NStepReplayBuffer
-           (with N_STEP and GAMMA).
-           - obs_dim = env.observation_space.shape[0]  (4)
-           - act_dim = env.action_space.n  (2)
-        2. Initialize the target network as a copy of the online network
-           using hard_update(online_net, target_net).
-        3. Step loop (TOTAL_TIMESTEPS iterations):
-           a. Compute epsilon using linear_epsilon_decay.
-           b. Get Q-values from the online network (unsqueeze obs to add
-              batch dim), then select an action with epsilon_greedy_action.
-           c. Step the environment. Push (obs, action, reward, next_obs, done)
-              to the replay buffer.
-           d. Track episode rewards: accumulate rewards, and when an episode
-              ends (term or trunc), record the total and reset.
-              Don't forget to call env.reset() when done!
-           e. After LEARNING_STARTS steps, train every TRAIN_FREQ steps:
-              - Sample a batch from the replay buffer
-              - Convert to tensors with batch_to_tensors
-              - Compute targets with compute_double_dqn_target.
-                IMPORTANT: pass gamma=GAMMA**N_STEP (not GAMMA) because the
-                n-step buffer already discounted the first N_STEP rewards.
-              - Compute loss with compute_td_loss
-              - Backprop and optimizer step
-           f. Hard-update the target network every TARGET_UPDATE_FREQ steps.
-        4. Save the model (torch.save) and return episode rewards.
-
     Returns:
         List of episode rewards (one per completed episode).
     """

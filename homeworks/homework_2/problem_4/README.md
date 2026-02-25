@@ -2,7 +2,7 @@
 
 In this problem, you will put together all the components from Problem 2 into a working DQN training loop on CartPole-v1.
 
-**Note:** DQN is often not a very performant algorithm compared to policy gradient methods like PPO. We have you implement it because its *components* -- replay buffers, target networks, epsilon-greedy exploration, and TD learning -- show up throughout modern RL. Think of this as learning the building blocks.
+**Note:** DQN is often not a very performant algorithm compared to policy gradient methods like PPO. We have you implement it because its *components* (replay buffers, target networks, epsilon-greedy exploration, and TD learning) show up throughout modern RL.
 
 ## Setup
 
@@ -54,11 +54,6 @@ uv run python train_dqn.py
 
 You should see evaluation reward reach 500 (the maximum) within 200k timesteps. The learning curve is saved to `dqn_cartpole.png`.
 
-## Tips
-
-- Pass `gamma=GAMMA**N_STEP` (not `GAMMA`) to `compute_double_dqn_target` because the n-step buffer already discounted the first N_STEP rewards internally.
-- Don't forget to initialize the target network as a copy of the online network before training starts.
-- When an episode ends (`terminated or truncated`), reset the environment and update `obs` accordingly.
 
 ## Leaderboard Submission
 

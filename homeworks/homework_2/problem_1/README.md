@@ -56,14 +56,6 @@ uv run python test_components.py --hint
 
 The tests are organized by part and will show you which components pass and which fail.
 
-## Tips
-
-- Start with Part 1 (`compute_returns`) as it's the simplest
-- `compute_gae` builds on similar concepts but uses TD errors
-- For the policy distributions, use PyTorch's `log_softmax` for numerical stability
-- The PPO loss needs to be **negated** because we maximize the objective but optimizers minimize
-- The RolloutBuffer needs to handle partial episodes correctly using bootstrap values
-
 ## Key Concepts
 
 ### Discounted Returns
@@ -83,7 +75,7 @@ ratio = pi(a|s) / pi_old(a|s)
 L = min(ratio * A, clip(ratio, 1-eps, 1+eps) * A)
 ```
 
-### Vectorized Environments (Why We Use Them)
+### Vectorized Environments
 
 PPO is an **on-policy** algorithm: it collects data with the current policy, uses that data for a few gradient updates, then throws it away and collects fresh data. This means PPO needs a *lot* of environment interaction relative to the number of gradient steps. With a single environment, most of the wall-clock time is spent waiting for `env.step()` rather than training the network.
 
@@ -94,7 +86,7 @@ PPO is an **on-policy** algorithm: it collects data with the current policy, use
 
 In practice, PPO implementations (like CleanRL) typically use 4-128 parallel environments to keep the GPU busy with training while CPUs handle environment stepping.
 
-### Bootstrap Values (Why They Matter)
+### Bootstrap Values
 
 In standard RL with a single environment, you typically collect complete episodes before computing returns. But with vectorized environments (running N environments in parallel), you collect a fixed number of steps (`num_steps`) from ALL environments simultaneously, regardless of whether episodes have finished.
 
@@ -120,10 +112,10 @@ This is why `compute_returns_and_advantages` takes `last_value` and `last_done`:
 - `last_done[i]` = 1 if env i's episode ended at the last step (don't bootstrap), 0 otherwise (do bootstrap)
 
 Without bootstrapping, you'd either:
-1. Throw away all partial episode data (wasteful)
-2. Treat partial episodes as if they ended with 0 future reward (incorrect, biased)
+1. Throw away all partial episode data
+2. Treat partial episodes as if they ended with 0 future reward
 
-Bootstrapping gives us an unbiased (in expectation) estimate that lets us use ALL collected data efficiently.
+Bootstrapping gives us an unbiased (in expectation) estimate that lets us use all the collected data efficiently.
 
 ## References
 
